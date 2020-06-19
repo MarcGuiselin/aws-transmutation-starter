@@ -9,17 +9,42 @@ phases:
 
       # Install dependencies
       - echo "Install dependencies..."
-      - npm install
+      - npm i -g yarn
+      - yarn install
   pre_build:
     commands:
       # Build site
       - echo "Building site..."
-      - npm run build
+      - yarn build
   build:
     commands:
       # Use AWS SAM to package the application by using AWS CloudFormation
       - echo "Deploying SAM..."
-      - aws cloudformation deploy --template /backend/template.yaml --stack-name $PIPELINE_STACK_NAME --s3-bucket $PIPELINE_BUCKET
+      - ls
+      # https://docs.aws.amazon.com/cli/latest/reference/cloudformation/deploy/index.html
+      - >
+        aws cloudformation deploy \
+          --template ./backend/template.yaml \
+          --stack-name $PIPELINE_STACK_NAME \
+          --no-fail-on-empty-changeset
+
+      # Load important outputs from deploy
+      - >
+        export WEBSITE_BUCKET="$( \
+          aws cloudformation describe-stacks \
+            --stack-name $PIPELINE_STACK_NAME \
+            --query "Stacks[0].Outputs[?OutputKey=='WebsiteBucket'].OutputValue" \
+            --output text \
+        )"
+      - >
+        export CLOUDFRONT_DIST_ID="$( \
+          aws cloudformation describe-stacks \
+            --stack-name $PIPELINE_STACK_NAME \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistId'].OutputValue" \
+            --output text \
+        )"
+      - echo $WEBSITE_BUCKET
+      - echo $CLOUDFRONT_DIST_ID
 
       # Sync new site build with s3 bucket
       - echo "Syncing Site..."

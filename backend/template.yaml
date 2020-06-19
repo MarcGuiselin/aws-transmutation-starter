@@ -1,0 +1,64 @@
+
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  # Static S3 bucket for hosting our website
+  StaticSite:
+    Type: AWS::S3::Bucket
+    Properties:
+      # BucketName: my-website-bucket
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+  StaticSiteS3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StaticSite
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - s3:GetObject
+            Resource: !Sub ${StaticSite.Arn}/*
+  # Cloudfront distro allowing for https connection to our static bucket site
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName: !Sub ${StaticSite}.s3-website-us-east-1.amazonaws.com
+            # It isn't necessary to set this value; but we need the same
+            # value for DefaultCacheBehavior.TargetOriginId
+            Id: !Ref StaticSite
+            CustomOriginConfig:
+              HTTPPort: 80
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+        Enabled: 'true'
+        #Aliases:
+        #  - marc-test.com
+        DefaultRootObject: index.html
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+          TargetOriginId: !Ref StaticSite
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+    DependsOn:
+      - StaticSiteS3BucketPolicy
+ 
+Outputs:
+  WebsiteUrl:
+    Value: !GetAtt CloudFrontDistribution.DomainName
+  WebsiteBucket:
+    Value: !Ref StaticSite
+  CloudFrontDistId:
+    Value: !Ref CloudFrontDistribution
