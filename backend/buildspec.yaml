@@ -1,0 +1,30 @@
+version: 0.2
+phases:
+  install:
+    commands:
+      # Load either production or integration environment variables depending on pipeline
+      - echo "Loading environment variables..."
+      - export $(cat $PIPELINE_ENVIRONMENT_VARIABLES_FILE | xargs)
+      - printenv
+
+      # Install dependencies
+      - echo "Install dependencies..."
+      - npm install
+  pre_build:
+    commands:
+      # Build site
+      - echo "Building site..."
+      - npm run build
+  build:
+    commands:
+      # Use AWS SAM to package the application by using AWS CloudFormation
+      - echo "Deploying SAM..."
+      - aws cloudformation deploy --template /backend/template.yaml --stack-name $PIPELINE_STACK_NAME --s3-bucket $PIPELINE_BUCKET
+
+      # Sync new site build with s3 bucket
+      - echo "Syncing Site..."
+      - aws s3 cp --recursive ./dist/ s3://$WEBSITE_BUCKET --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers
+      
+      # Devalidate outdated resources from Cloudfront
+      - echo "Devalidating Cloudfront Cache..."
+      - aws cloudfront create-invalidation --distribution-id=$CLOUDFRONT_DIST_ID --paths "/*"
