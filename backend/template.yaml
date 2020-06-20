@@ -32,16 +32,38 @@ Resources:
           Properties:
             Path: /hello-world
             Method: get
+            ApiId: !Ref HttpApi
   # Define API http endpoint
   HttpApi: # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-httpapi.html
     Type: AWS::Serverless::HttpApi
     Properties:
+      #StageName: prod
       AccessLogSettings:
         DestinationArn: !GetAtt LogGroup.Arn
         Format: $context.requestId
-      Domain: 
-        CertificateArn: !Ref StaticSiteCert
+      Domain:
         DomainName: !Sub api.${Domain}
+        CertificateArn: !Ref StaticSiteCert
+        EndpointConfiguration: REGIONAL
+        Route53:
+          HostedZoneId: !Ref HostedZone
+          IpV6: true
+      CorsConfiguration:
+        AllowMethods:
+          - GET
+          - PUT
+          - PATCH
+          - DELETE
+          - POST
+        AllowOrigins:
+          - '*'
+        AllowHeaders:
+          - content-type
+        MaxAge: "10"
+        AllowCredentials: false
+      #Domain: 
+      #  CertificateArn: !Ref StaticSiteCert
+      #  DomainName: !Sub api.${Domain}
       #!If
       #  - HasDomain
       #  - CertificateArn: !Ref StaticSiteCert
@@ -134,12 +156,11 @@ Resources:
     Type: AWS::Route53::HostedZone
     Properties:
       Name: !Sub ${Domain}.
-  # Create DNS records
   DnsRecords:
     Condition: HasDomain
     Type: AWS::Route53::RecordSetGroup
     Properties:
-      HostedZoneName: !Sub ${Domain}.
+      HostedZoneId: !Ref HostedZone
       RecordSets:
         # Create DNS records to link the cloudfront distro to our domain
         - AliasTarget:
@@ -153,16 +174,16 @@ Resources:
           Name: !Sub ${Domain}.
           Type: AAAA # ipv 6
         # Create DNS records to link our api to this domain
-        - AliasTarget:
-            DNSName: !Sub ${HttpApi}.cloudfront.net
-            HostedZoneId: Z2FDTNDATAQYW2
-          Name: !Sub api.${Domain}
-          Type: A # ipv 4
-        - AliasTarget:
-            DNSName: !Sub ${HttpApi}.cloudfront.net
-            HostedZoneId: Z2FDTNDATAQYW2
-          Name: !Sub api.${Domain}
-          Type: AAAA # ipv 6
+        #- AliasTarget:
+        #    DNSName: !Sub ${HttpApi}.cloudfront.net
+        #    HostedZoneId: Z2FDTNDATAQYW2
+        #  Name: !Sub api.${Domain}
+        #  Type: A # ipv 4
+        #- AliasTarget:
+        #    DNSName: !Sub ${HttpApi}.cloudfront.net
+        #    HostedZoneId: Z2FDTNDATAQYW2
+        #  Name: !Sub api.${Domain}
+        #  Type: AAAA # ipv 6
 
 Outputs:
   ApiUrl:
