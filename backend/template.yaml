@@ -2,20 +2,50 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
+Parameters:
+  Domain:
+    Description: GitHub username owning the repo
+    Type: String
+    Default: 'marc-test.com'
+
+Conditions:
+  HasDomain:
+    !Not [!Equals [!Ref Domain, '']]
+
+Globals:
+  # Applies to all serverless functions
+  Function:
+    Runtime: nodejs12.x
+    Timeout: 3
+    Handler: index.handler
+
 Resources:
-  # Define API Resources
-  HelloWorldFunction:
+  # Serverless API Functions
+  HttpApiFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: api/hello-world/ ################ https://stackoverflow.com/questions/54065592/aws-sam-publish-deploy-flow
-      Handler: index.handler
-      Runtime: nodejs12.x
+      CodeUri: api/hello-world/
       Events:
         HelloWorld:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Type: HttpApi # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
             Path: /hello-world
             Method: get
+  # Define API http endpoint
+  HttpApi: # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-httpapi.html
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      AccessLogSettings:
+        DestinationArn: !GetAtt LogGroup.Arn
+        Format: $context.requestId
+      Domain: !If
+        - HasDomain
+        - CertificateArn: !Ref StaticSiteCert
+          DomainName: !Sub api.${Domain}
+          EndpointConfiguration: EDGE
+        - !Ref AWS::NoValue
+  LogGroup:
+    Type: AWS::Logs::LogGroup
   # Static S3 bucket for hosting our website
   StaticSite:
     Type: AWS::S3::Bucket
@@ -52,8 +82,11 @@ Resources:
               HTTPSPort: 443
               OriginProtocolPolicy: http-only
         Enabled: 'true'
-        #Aliases:
-        #  - marc-test.com
+        Aliases: 
+          - !If
+            - HasDomain
+            - !Ref Domain
+            - !Ref AWS::NoValue
         DefaultRootObject: index.html
         DefaultCacheBehavior:
           AllowedMethods:
@@ -65,12 +98,75 @@ Resources:
             Cookies:
               Forward: none
           ViewerProtocolPolicy: redirect-to-https
+        ViewerCertificate: !If
+          - HasDomain
+          - - AcmCertificateArn: !Ref StaticSiteCert
+            - SslSupportMethod: sni-only
+          - !Ref AWS::NoValue
+        ## Uncomment the following section in case you want to enable logging for CloudFront requests
+        # Logging:
+        #  IncludeCookies: 'false'
+        #   Bucket: mylogs.s3.amazonaws.com
+        #   Prefix: myprefix
     DependsOn:
       - StaticSiteS3BucketPolicy
- 
+  # Certification for prod website
+  StaticSiteCert:
+    Condition: HasDomain
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref Domain
+      SubjectAlternativeNames:
+        - !Sub api.${Domain}
+      DomainValidationOptions:
+      - DomainName: !Ref Domain
+        ValidationDomain: !Ref Domain
+  # Create a hosted zone for our domain
+  HostedZone:
+    Condition: HasDomain
+    Type: AWS::Route53::HostedZone
+    Properties:
+      Name: !Sub ${Domain}.
+  # Create DNS records
+  DnsRecords:
+    Condition: HasDomain
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneName: !Sub ${Domain}.
+      RecordSets:
+        # Create DNS records to link the cloudfront distro to our domain
+        - AliasTarget:
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2
+          Name: !Sub ${Domain}.
+          Type: A # ipv 4
+        - AliasTarget:
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+            HostedZoneId: Z2FDTNDATAQYW2
+          Name: !Sub ${Domain}.
+          Type: AAAA # ipv 6
+        # Create DNS records to link our api to this domain
+        - AliasTarget:
+            DNSName: !Sub: ${HttpApi}.cloudfront.net
+            HostedZoneId: Z2FDTNDATAQYW2
+          Name: !Sub api.${Domain}
+          Type: A # ipv 4
+        - AliasTarget:
+            DNSName: !Sub: ${HttpApi}.cloudfront.net
+            HostedZoneId: Z2FDTNDATAQYW2
+          Name: !Sub api.${Domain}
+          Type: AAAA # ipv 6
+
 Outputs:
+  ApiUrl:
+    Description: URL of your API endpoint
+    Value: !Sub: 'https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
   WebsiteUrl:
-    Value: !GetAtt CloudFrontDistribution.DomainName
+    Description: URL of your Static Website
+    Value: !If
+      - HasDomain
+      - !Ref Domain
+      - !GetAtt CloudFrontDistribution.DomainName
   WebsiteBucket:
     Value: !Ref StaticSite
   CloudFrontDistId:
