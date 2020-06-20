@@ -4,9 +4,10 @@ Transform: AWS::Serverless-2016-10-31
 
 Parameters:
   Domain:
-    Description: GitHub username owning the repo
+    Description: >
+      Optional domain name with which to host our website. Formatted like: 'example.com'
     Type: String
-    Default: 'marc-test.com'
+    Default: ''
 
 Conditions:
   HasDomain:
@@ -38,12 +39,15 @@ Resources:
       AccessLogSettings:
         DestinationArn: !GetAtt LogGroup.Arn
         Format: $context.requestId
-      Domain: !If
-        - HasDomain
-        - CertificateArn: !Ref StaticSiteCert
-          DomainName: !Sub api.${Domain}
-          EndpointConfiguration: EDGE
-        - !Ref AWS::NoValue
+      Domain: 
+        CertificateArn: !Ref StaticSiteCert
+        DomainName: !Sub api.${Domain}
+      #!If
+      #  - HasDomain
+      #  - CertificateArn: !Ref StaticSiteCert
+      #    DomainName: !Sub api.${Domain}
+      #    EndpointConfiguration: EDGE
+      #  - !Ref AWS::NoValue
   LogGroup:
     Type: AWS::Logs::LogGroup
   # Static S3 bucket for hosting our website
@@ -73,7 +77,7 @@ Resources:
     Properties:
       DistributionConfig:
         Origins:
-          - DomainName: !Sub ${StaticSite}.s3-website-us-east-1.amazonaws.com
+          - DomainName: !Sub ${StaticSite}.s3-website-${AWS::Region}.amazonaws.com
             # It isn't necessary to set this value; but we need the same
             # value for DefaultCacheBehavior.TargetOriginId
             Id: !Ref StaticSite
@@ -98,10 +102,13 @@ Resources:
             Cookies:
               Forward: none
           ViewerProtocolPolicy: redirect-to-https
+        #ViewerCertificate: 
+        #  AcmCertificateArn: !Ref StaticSiteCert
+        #  SslSupportMethod: sni-only
         ViewerCertificate: !If
           - HasDomain
-          - - AcmCertificateArn: !Ref StaticSiteCert
-            - SslSupportMethod: sni-only
+          - AcmCertificateArn: !Ref StaticSiteCert
+            SslSupportMethod: sni-only
           - !Ref AWS::NoValue
         ## Uncomment the following section in case you want to enable logging for CloudFront requests
         # Logging:
@@ -147,12 +154,12 @@ Resources:
           Type: AAAA # ipv 6
         # Create DNS records to link our api to this domain
         - AliasTarget:
-            DNSName: !Sub: ${HttpApi}.cloudfront.net
+            DNSName: !Sub ${HttpApi}.cloudfront.net
             HostedZoneId: Z2FDTNDATAQYW2
           Name: !Sub api.${Domain}
           Type: A # ipv 4
         - AliasTarget:
-            DNSName: !Sub: ${HttpApi}.cloudfront.net
+            DNSName: !Sub ${HttpApi}.cloudfront.net
             HostedZoneId: Z2FDTNDATAQYW2
           Name: !Sub api.${Domain}
           Type: AAAA # ipv 6
@@ -160,7 +167,7 @@ Resources:
 Outputs:
   ApiUrl:
     Description: URL of your API endpoint
-    Value: !Sub: 'https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
+    Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
   WebsiteUrl:
     Description: URL of your Static Website
     Value: !If
