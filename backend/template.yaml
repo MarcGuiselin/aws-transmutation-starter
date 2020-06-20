@@ -1,4 +1,4 @@
-
+# AWS Transmutation Pipeline Template
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
@@ -7,7 +7,7 @@ Resources:
   HelloWorldFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: api/hello-world/
+      CodeUri: api/hello-world/ ################ https://stackoverflow.com/questions/54065592/aws-sam-publish-deploy-flow
       Handler: index.handler
       Runtime: nodejs12.x
       Events:

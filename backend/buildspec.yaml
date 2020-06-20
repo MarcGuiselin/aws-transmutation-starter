@@ -9,7 +9,7 @@ phases:
 
       # Install dependencies
       - echo "Install dependencies..."
-      - npm i -g yarn
+      # - npm i -g yarn
       - yarn install
   pre_build:
     commands:
@@ -18,15 +18,27 @@ phases:
       - yarn build
   build:
     commands:
-      # Use AWS SAM to package the application by using AWS CloudFormation
+      # Use AWS SAM to package the application then deploy using CloudFormation
       - echo "Deploying SAM..."
-      - ls
-      # https://docs.aws.amazon.com/cli/latest/reference/cloudformation/deploy/index.html
+      - >
+        sam package \
+          --template-file ./backend/template.yaml \
+          --output-template-file ./packaged.yaml \
+          --s3-bucket $PACKAGE_BUCKET
       - >
         aws cloudformation deploy \
-          --template ./backend/template.yaml \
+          --template ./packaged.yaml \
           --stack-name $PIPELINE_STACK_NAME \
+          --capabilities CAPABILITY_IAM \
           --no-fail-on-empty-changeset
+      
+      # https://docs.aws.amazon.com/cli/latest/reference/cloudformation/deploy/index.html
+      #- >
+      #  aws cloudformation deploy \
+      #    --template ./backend/template.yaml \
+      #    --stack-name $PIPELINE_STACK_NAME \
+      #    --s3-bucket $PACKAGE_BUCKET
+      #    --no-fail-on-empty-changeset
 
       # Load important outputs from deploy
       - >
@@ -48,7 +60,8 @@ phases:
 
       # Sync new site build with s3 bucket
       - echo "Syncing Site..."
-      - aws s3 cp --recursive ./dist/ s3://$WEBSITE_BUCKET --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers
+      - aws s3 cp --recursive ./dist/ "s3://$WEBSITE_BUCKET" 
+      # --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers
       
       # Devalidate outdated resources from Cloudfront
       - echo "Devalidating Cloudfront Cache..."
