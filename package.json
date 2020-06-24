@@ -16,9 +16,12 @@
     "url": "https://github.com/MarcGuiselin/aws-transmutation-starter/issues"
   },
   "homepage": "https://github.com/MarcGuiselin/aws-transmutation-starter#readme",
+  "browserslist": [
+    "since 2017-06"
+  ],
   "devDependencies": {
     "cssnano": "^4.1.10",
     "parcel": "^1.12.4",
-    "sass": "^1.26.8"
+    "sass": "^1.26.9"
   }
 }

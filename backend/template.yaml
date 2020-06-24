@@ -25,23 +25,24 @@ Resources:
   HttpApiFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: api/hello-world/
+      CodeUri: functions/funnies/
       Events:
-        HelloWorld:
+        GetFunny:
           Type: HttpApi # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
-            Path: /hello-world
+            Path: /get-funny
             Method: get
             ApiId: !Ref HttpApi
-  # Define API http endpoint
+  # Define API http endpoint (Need two because FN:If does not work as expected for )
   HttpApi: # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-httpapi.html
     Type: AWS::Serverless::HttpApi
+    Conditional: 
     Properties:
       #StageName: prod
       AccessLogSettings:
         DestinationArn: !GetAtt LogGroup.Arn
         Format: $context.requestId
-      Domain:
+      Domain: # Conditional how?
         DomainName: !Sub api.${Domain}
         CertificateArn: !Ref StaticSiteCert
         EndpointConfiguration: REGIONAL
@@ -95,6 +96,7 @@ Resources:
             Resource: !Sub ${StaticSite.Arn}/*
   # Cloudfront distro allowing for https connection to our static bucket site
   CloudFrontDistribution:
+    Condition: HasDomain
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
@@ -107,7 +109,7 @@ Resources:
               HTTPPort: 80
               HTTPSPort: 443
               OriginProtocolPolicy: http-only
-        Enabled: 'true'
+        Enabled: True
         Aliases: 
           - !If
             - HasDomain
@@ -120,7 +122,7 @@ Resources:
             - HEAD
           TargetOriginId: !Ref StaticSite
           ForwardedValues:
-            QueryString: 'false'
+            QueryString: False
             Cookies:
               Forward: none
           ViewerProtocolPolicy: redirect-to-https
@@ -186,16 +188,26 @@ Resources:
         #  Type: AAAA # ipv 6
 
 Outputs:
+  # Our api endpoint is different for dev and prod deployments
   ApiUrl:
     Description: URL of your API endpoint
-    Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/'
-  WebsiteUrl:
+    Value: !If
+      - HasDomain
+      - !Sub https://api.${Domain}
+      - !Sub https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+  # Our website homepage is different for dev and prod deployments
+  HomepageUrl:
     Description: URL of your Static Website
     Value: !If
       - HasDomain
-      - !Ref Domain
-      - !GetAtt CloudFrontDistribution.DomainName
+      - !Sub https://${Domain}
+      - !Sub https://${StaticSite}.s3.${AWS::Region}.${AWS::URLSuffix}/index.html
+  # The static website buckets we can write website files to
   WebsiteBucket:
     Value: !Ref StaticSite
+  # In production build, the cloudfront distribution must be devalidated so users get the new website
   CloudFrontDistId:
-    Value: !Ref CloudFrontDistribution
+    Value: !If
+      - HasDomain
+      - !Ref CloudFrontDistribution
+      - ''

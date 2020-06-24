@@ -1,0 +1,11 @@
+{
+  "name": "funnies",
+  "version": "1.0.0",
+  "description": "An example Serverless Function",
+  "main": "index.js",
+  "author": "Marc Guiselin",
+  "license": "MIT",
+  "dependencies": {
+    "funnies": "^2.1.0"
+  }
+}

@@ -1,0 +1,53 @@
+version: 0.2
+phases:
+  install:
+    commands:
+      # Load important outputs from deploy
+      - >
+        export WEBSITE_BUCKET="$( \
+          aws cloudformation describe-stacks \
+            --stack-name $PIPELINE_STACK_NAME \
+            --query "Stacks[0].Outputs[?OutputKey=='WebsiteBucket'].OutputValue" \
+            --output text \
+        )"
+      - >
+        export CLOUDFRONT_DIST_ID="$( \
+          aws cloudformation describe-stacks \
+            --stack-name $PIPELINE_STACK_NAME \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistId'].OutputValue" \
+            --output text \
+        )"
+      - >
+        export API_URL="$( \
+          aws cloudformation describe-stacks \
+            --stack-name $PIPELINE_STACK_NAME \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
+            --output text \
+        )"
+      - echo $WEBSITE_BUCKET
+      - echo $CLOUDFRONT_DIST_ID
+      - echo $API_URL
+
+      # Install dependencies
+      - echo "Install dependencies..."
+      - npm i -g yarn
+      - yarn install
+  build:
+    commands:
+      # Build site
+      - echo "Building site..."
+      - yarn build
+  post_build:
+    commands:
+      # Sync new site build with s3 bucket
+      - echo "Syncing Site..."
+      - aws s3 cp --recursive ./dist/ "s3://$WEBSITE_BUCKET" 
+
+      # Devalidate outdated resources from Cloudfront
+      - |
+        if [ -z "${CLOUDFRONT_DIST_ID}" ]; then 
+          echo "No cloudfront distribution to devalidate"
+        else
+          echo "Devalidating Cloudfront Cache..."
+          aws cloudfront create-invalidation --distribution-id=$CLOUDFRONT_DIST_ID --paths "/*"
+        fi

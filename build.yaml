@@ -1,0 +1,25 @@
+version: 0.2
+phases:
+  install:
+    commands:
+      # Install dependencies for serverless functions
+      - echo "Install serverless function dependencies..."
+      - npm i -g yarn
+      - cd backend/functions/funnies
+      - yarn install
+      - cd ../../..
+  build:
+    commands:
+      # Use AWS SAM to package the application then deploy using CloudFormation
+      - echo "Deploying SAM..."
+      - >
+        sam package \
+          --template-file ./backend/template.yaml \
+          --output-template-file $PIPELINE_PACKAGED_TEMPLATE_PATH \
+          --s3-bucket $PIPELINE_BUCKET
+artifacts:
+  type: S3
+  files:
+    - test-configuration.json
+    - prod-configuration.json
+    - packaged-template.yaml
