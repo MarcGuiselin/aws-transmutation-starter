@@ -1,0 +1,58 @@
+# === AWS Transmutation Pipeline Configuration File ===
+#
+# See https://github.com/MarcGuiselin/aws-transmutation for documentation
+#
+# WARNING: Currently changing this file might break transmutation pipeline! Delete
+#          your pipeline's stack, edit this file, push changes, and then you can
+#          create a new pipeline.
+
+# Default settings for all branch pipelines
+[[pipeline]]
+enabled = true
+branch = "*"
+stage = "test"
+features = "Build > Deploy > Integration"
+description = "A misc testing deployment"
+# Runs cleanup and then deletes the pipeline and its stack after their branch is deleted. False by default.
+delete_old_pipeline = true
+
+  # Default file locations (relative to repo root)
+  [pipeline.file_paths]
+  packaged_template = "packaged-template.yaml"
+  template_configuration = "aws/test-configuration.json"
+  build_spec = "pipeline/build.yaml"
+  deploy_spec = "pipeline/deploy.yaml"
+
+  # Default compute environment used for scripts
+  # See https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html
+  # and https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-available.html
+  [pipeline.environment]
+  compute_type = "BUILD_GENERAL1_SMALL"
+  environment_type = "LINUX_CONTAINER"
+  image = "aws/codebuild/amazonlinux2-x86_64-standard:3.0"
+
+
+# Production Deployment
+[[pipeline]]
+enabled = true
+branch = "master"
+stack = "my-project" # Override stack name
+stage = "prod" # typically prod or test
+features = "Build > Deploy"
+description = "The production deployment"
+delete_old_pipeline = false # Override delete_old_pipeline for master deployment pipeline
+
+
+# Bors-NG (matches staging OR trying branches with regex)
+[[pipeline]]
+enabled = true
+branch = "staging|trying"
+stage = "test"
+features = "Build > Deploy > Integration"
+description = "Test deployments for Bors-NG"
+
+
+# Bors-NG .tmp branches should not be built
+[[pipeline]]
+enabled = false
+branch = "*.tmp"
