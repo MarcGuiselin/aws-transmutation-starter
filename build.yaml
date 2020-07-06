@@ -5,7 +5,7 @@ phases:
       # Install dependencies for serverless functions
       - echo "Install serverless function dependencies..."
       - npm i -g yarn
-      - cd backend/functions/funnies
+      - cd aws/functions/funnies
       - yarn install
       - cd ../../..
   build:
@@ -14,7 +14,7 @@ phases:
       - echo "Deploying SAM..."
       - >
         sam package \
-          --template-file ./backend/template.yaml \
+          --template-file ./aws/template.yaml \
           --output-template-file $PIPELINE_PACKAGED_TEMPLATE_PATH \
           --s3-bucket $PIPELINE_BUCKET
 artifacts:

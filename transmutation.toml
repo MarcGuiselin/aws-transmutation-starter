@@ -7,52 +7,45 @@
 #          create a new pipeline.
 
 # Default settings for all branch pipelines
-[[pipeline]]
 enabled = true
-branch = "*"
-stage = "test"
+stage = "test" # typically prod or test
 features = "Build > Deploy > Integration"
-description = "A misc testing deployment"
+description = "A test deployment"
 # Runs cleanup and then deletes the pipeline and its stack after their branch is deleted. False by default.
 delete_old_pipeline = true
 
-  # Default file locations (relative to repo root)
-  [pipeline.file_paths]
-  packaged_template = "packaged-template.yaml"
-  template_configuration = "aws/test-configuration.json"
-  build_spec = "pipeline/build.yaml"
-  deploy_spec = "pipeline/deploy.yaml"
+# Default file locations (relative to repo root)
+[file_paths]
+template_configuration = "aws/test-configuration.json"
+build_spec = "build.yaml"
+deploy_spec = "deploy.yaml"
+integ_spec = "integ.yaml"
 
-  # Default compute environment used for scripts
-  # See https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html
-  # and https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-available.html
-  [pipeline.environment]
-  compute_type = "BUILD_GENERAL1_SMALL"
-  environment_type = "LINUX_CONTAINER"
-  image = "aws/codebuild/amazonlinux2-x86_64-standard:3.0"
-
+# Default compute environment used for scripts
+# See https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-compute-types.html
+# and https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-available.html
+[environment]
+type = "LINUX_CONTAINER"
+compute = "BUILD_GENERAL1_SMALL"
+image = "aws/codebuild/amazonlinux2-x86_64-standard:3.0"
 
 # Production Deployment
 [[pipeline]]
-enabled = true
 branch = "master"
-stack = "my-project" # Override stack name
-stage = "prod" # typically prod or test
+stage = "prod"
+stack = "my-transmutation-starter-master-stack" # Override stack name for master deployment
 features = "Build > Deploy"
 description = "The production deployment"
 delete_old_pipeline = false # Override delete_old_pipeline for master deployment pipeline
+  [pipeline.file_paths]
+  template_configuration = "aws/prod-configuration.json"
 
-
-# Bors-NG (matches staging OR trying branches with regex)
+# Bors-NG staging and trying branches should be built
 [[pipeline]]
-enabled = true
 branch = "staging|trying"
-stage = "test"
-features = "Build > Deploy > Integration"
 description = "Test deployments for Bors-NG"
 
-
-# Bors-NG .tmp branches should not be built
+# Bors-NG *.tmp branches should not be built
 [[pipeline]]
 enabled = false
 branch = "*.tmp"
